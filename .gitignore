@@ -1,4 +1,5 @@
 # Dependencies installed by OpenCode for custom tools
+.opencode
 .opencode/node_modules/
 .opencode/bun.lock
 .opencode/bun.lockb
