@@ -53,6 +53,7 @@ The Python scripts use only the standard library. You do not need `pip install` 
 | `typst` | Compiles `.typ` files to PDF on your machine. |
 | `pdflatex` or `tectonic` | Compiles `.tex` files to PDF on your machine. You can also use Overleaf. |
 | `GITHUB_TOKEN` or `GH_TOKEN` environment variable | Raises the GitHub API rate limit when reading your repositories. |
+| Docker with Compose 2.24 or newer, or Apptainer | Run everything in a container instead of installing OpenCode and Python. See "Run in a container". |
 
 If you only use `.md`, `.docx` or `.txt` files as input, you do not need a PDF reader.
 
@@ -102,6 +103,85 @@ ssh -L 8765:127.0.0.1:8765 <user>@<host>
 - **Details** in the top bar shows the agent's reasoning and the full tool inputs and outputs. Use it when something goes wrong.
 - The current session is kept when you reload the page. **New session** starts over.
 - The older wizard UI is still available at http://127.0.0.1:8765/classic/.
+
+## Run in a container
+
+The image contains OpenCode, Python, `pdftotext` and the packages the custom tools need. You only need Docker (or Podman) on the host. Your files in `inputs/` and `outputs/` stay on the host and are mounted into the container.
+
+### With Docker Compose
+
+```bash
+echo "UID=$(id -u)" > .env
+echo "GID=$(id -g)" >> .env
+docker compose up -d --build
+```
+
+Open http://127.0.0.1:8765.
+
+Log in to a model provider once. The login is stored in the `opencode-home` volume and kept across restarts:
+
+```bash
+docker compose exec cv-tailor opencode auth login
+docker compose restart
+```
+
+Instead of logging in, you can put API keys in `.env`, for example:
+
+```
+GOOGLE_GENERATIVE_AI_API_KEY=...
+OPENAI_API_KEY=...
+ANTHROPIC_API_KEY=...
+GITHUB_TOKEN=...
+```
+
+`.env` is not copied into the image. Do not commit it.
+
+Stop with `docker compose down`. Add `-v` to also delete the stored login and sessions.
+
+### With plain Docker
+
+```bash
+docker build -t cv-tailor .
+docker run -d --name cv-tailor \
+  --user "$(id -u):$(id -g)" \
+  -p 127.0.0.1:8765:8765 \
+  -v "$PWD/inputs:/app/inputs" \
+  -v "$PWD/outputs:/app/outputs" \
+  -v cv-tailor-home:/data/home \
+  cv-tailor
+docker exec -it cv-tailor opencode auth login
+```
+
+### Build options
+
+```bash
+docker build --build-arg INSTALL_TYPST=true -t cv-tailor .          # include the Typst compiler
+docker build --build-arg OPENCODE_VERSION=1.19.5 -t cv-tailor .     # pin another OpenCode version
+```
+
+LaTeX is not included because it makes the image very large. Use Overleaf or a local `pdflatex` for `.tex` files.
+
+### With Apptainer (HPC systems without Docker)
+
+Build the image on a machine with Docker, then copy it over:
+
+```bash
+docker build -t cv-tailor .
+docker save cv-tailor -o cv-tailor.tar
+scp cv-tailor.tar <user>@<host>:
+```
+
+On the HPC system:
+
+```bash
+apptainer build cv-tailor.sif docker-archive://cv-tailor.tar
+cd cv-tailor   # the folder with inputs/ and outputs/
+apptainer run --writable-tmpfs \
+  --bind "$PWD/inputs:/app/inputs,$PWD/outputs:/app/outputs" \
+  cv-tailor.sif
+```
+
+Apptainer uses your normal home directory, so the container uses the same OpenCode login as `opencode` on the host. Run `opencode auth login` on the host first if needed. The node needs internet access for the model API and job pages, so run it on a login node, not a compute node without network. Use SSH port forwarding to open the UI from your laptop.
 
 ## Run in the terminal instead
 
@@ -156,6 +236,7 @@ Or upload the `.tex` file to Overleaf.
 | `ui/server.py` | Web server. Starts OpenCode and passes requests to it |
 | `ui/quiet/` | Default web UI |
 | `ui/static/` | Older wizard UI, served at `/classic/` |
+| `Dockerfile`, `docker-compose.yml`, `.dockerignore` | Container setup |
 
 ## Troubleshooting
 

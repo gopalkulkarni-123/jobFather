@@ -10,3 +10,6 @@ inputs/*
 !inputs/profile.example.json
 outputs/*
 !outputs/.gitkeep
+
+# Container secrets (API keys)
+.env
