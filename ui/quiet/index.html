@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CV Tailor</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="/quiet/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot" id="engineDot" title="OpenCode engine"></span>
+      <strong>CV Tailor</strong>
+      <span class="muted small" id="engineText">connecting...</span>
+    </div>
+    <div class="top-actions">
+      <select id="modelSelect" title="Model used by OpenCode">
+        <option value="">Default model</option>
+      </select>
+      <label class="toggle" title="Show tool inputs, outputs and reasoning">
+        <input type="checkbox" id="detailsToggle" /> Details
+      </label>
+      <button class="btn ghost" id="newSessionBtn" type="button">New session</button>
+      <a class="btn ghost" href="/classic/" title="Old wizard UI">Classic</a>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- LEFT: inputs and bundles -->
+    <aside class="panel side">
+      <section>
+        <h3>Inputs</h3>
+
+        <label class="field-label">CV <span class="tag" id="cvTag">missing</span></label>
+        <label class="drop" id="cvDrop">
+          <input type="file" id="cvFile" accept=".pdf,.docx,.md,.tex,.typ,.txt" hidden />
+          <span id="cvLabel">Drop or choose CV file</span>
+        </label>
+
+        <label class="field-label">LinkedIn <span class="tag" id="liTag">missing</span>
+          <button class="link" type="button" id="liModeBtn">paste text</button>
+        </label>
+        <label class="drop" id="liDrop">
+          <input type="file" id="liFile" accept=".pdf,.txt,.md" hidden />
+          <span id="liLabel">Drop LinkedIn PDF export</span>
+        </label>
+        <textarea id="liText" class="hidden" rows="4" placeholder="Paste LinkedIn profile text"></textarea>
+
+        <label class="field-label" for="githubInput">GitHub</label>
+        <input id="githubInput" type="text" placeholder="username or profile URL" />
+
+        <label class="field-label">Job <button class="link" type="button" id="jobModeBtn">paste text</button></label>
+        <input id="jobUrl" type="url" placeholder="https://... job posting URL" />
+        <textarea id="jobText" class="hidden" rows="5" placeholder="Paste the job description"></textarea>
+
+        <label class="field-label" for="formatSelect">Source format</label>
+        <select id="formatSelect">
+          <option value="both">Markdown + LaTeX + Typst</option>
+          <option value="latex">Markdown + LaTeX</option>
+          <option value="typst">Markdown + Typst</option>
+        </select>
+
+        <div class="row gap">
+          <button class="btn primary grow" id="tailorBtn" type="button">Start tailoring</button>
+          <button class="btn" id="scoreBtn" type="button" title="Quick baseline score only">Score</button>
+        </div>
+      </section>
+
+      <section>
+        <h3>Output bundles</h3>
+        <ul class="bundle-list" id="bundleList"><li class="muted small">None yet</li></ul>
+      </section>
+    </aside>
+
+    <!-- CENTER: conversation -->
+    <section class="panel feed-wrap">
+      <div class="feed" id="feed">
+        <div class="empty" id="emptyState">
+          <h2>Add your inputs and press Start tailoring</h2>
+          <p class="muted">OpenCode runs in the background. You only see its messages, short progress steps and its questions.</p>
+        </div>
+      </div>
+      <div class="status-line hidden" id="statusLine">
+        <span class="spinner"></span><span id="statusText">Working...</span>
+        <button class="btn ghost small" id="stopBtn" type="button">Stop</button>
+      </div>
+      <form class="composer" id="composer">
+        <textarea id="composerInput" rows="1" placeholder="Message the agent, e.g. make the summary shorter"></textarea>
+        <button class="btn primary" type="submit" id="sendBtn">Send</button>
+      </form>
+    </section>
+
+    <!-- RIGHT: documents -->
+    <aside class="panel docs">
+      <div class="score-row">
+        <div class="score"><span class="muted small">Before</span><b id="scoreBefore">-</b></div>
+        <span class="arrow">→</span>
+        <div class="score"><span class="muted small">After</span><b id="scoreAfter">-</b></div>
+      </div>
+      <div class="doc-head">
+        <div class="tabs" id="docTabs">
+          <button type="button" data-kind="cv" class="active">CV</button>
+          <button type="button" data-kind="cover">Cover letter</button>
+          <button type="button" data-kind="report">Report</button>
+        </div>
+        <select id="fileSelect" class="hidden"></select>
+      </div>
+      <div class="doc-view" id="docView"><p class="muted">Generated files appear here.</p></div>
+      <div class="doc-actions">
+        <button class="btn small" id="copyBtn" type="button">Copy</button>
+        <button class="btn small" id="downloadBtn" type="button">Download</button>
+        <a class="btn small" id="zipBtn" href="#">Zip</a>
+        <button class="btn small" id="atsBtn" type="button">ATS check</button>
+      </div>
+      <div class="ats-result hidden" id="atsResult"></div>
+    </aside>
+  </main>
+
+  <div class="toast hidden" id="toast"></div>
+  <script src="/quiet/app.js"></script>
+</body>
+</html>

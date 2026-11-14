@@ -33,9 +33,9 @@ export default tool({
           "--user",
           args.userOrUrl,
           "--max-repos",
-          String(args.maxRepos),
+          String(args.maxRepos ?? 10),
           "--readme-repos",
-          String(args.readmeRepos),
+          String(args.readmeRepos ?? 5),
         ],
         { maxBuffer: 10 * 1024 * 1024 }
       )

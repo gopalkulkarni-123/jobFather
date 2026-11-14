@@ -16,7 +16,21 @@ Launch the **CV Tailor Studio** web interface (zero extra packages needed — au
 /home/hpcgkulk/.gemini/antigravity/scratch/cv-tailor/start-ui.sh
 ```
 
-Then open **http://127.0.0.1:8765** in your browser:
+Then open **http://127.0.0.1:8765** in your browser.
+
+### Quiet UI (default, `ui/quiet/`)
+
+OpenCode still does all the work. The page runs the real `/tailor` and `/score` commands and hides OpenCode's noise:
+
+- **Left:** upload CV and LinkedIn, enter GitHub and the job URL (or paste the job text), pick the source format, then press **Start tailoring** or **Score**.
+- **Center:** the agent's messages only. Tool calls are folded into one-line steps such as "Read the job posting". Questions from the `question` tool appear as cards, one at a time. Permission requests appear as Allow/Deny cards. Use the box at the bottom to ask for changes.
+- **Right:** before/after score, the generated CV, cover letter and report, with copy, download, zip and ATS check.
+- **Details** (top bar) shows reasoning plus tool inputs and outputs when you need to debug.
+- The session survives a page reload. **New session** starts fresh.
+- The old wizard UI is still available at **http://127.0.0.1:8765/classic/**.
+
+### Classic UI (`ui/static/`, at `/classic/`)
+
 1. **Left Panel (Inputs):** Drag-and-drop your CV (`.pdf`, `.docx`, `.md`, `.tex`) and LinkedIn PDF (or paste text), enter your GitHub URL and Target Job URL, and click **Start Tailoring**.
 2. **Center Panel (5+ Question Interview):** Watch your **Baseline Fitness Score**, click through interactive multi-choice + custom answer cards for the **5+ discovery & design questions**, and chat live with `career-architect`.
 3. **Right Panel (Score & Deliverables):** View your **Before -> After Fitness Score**, switch tabs across `.md`, `.tex`, and `.typ` CV/Cover Letter files, edit in-place, run **1-click ATS Checks**, or download a `.zip` bundle.

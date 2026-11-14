@@ -22,15 +22,18 @@ export default tool({
   },
   async execute(args, context) {
     const baseDir = context.directory || projectRoot
-    const resolvedTarget = path.isAbsolute(args.targetPath)
-      ? args.targetPath
-      : path.resolve(baseDir, args.targetPath)
+    // Schema defaults are not always applied at runtime, so fall back explicitly
+    const targetPath = args.targetPath ?? "inputs"
+    const maxChars = args.maxChars ?? 40000
+    const resolvedTarget = path.isAbsolute(targetPath)
+      ? targetPath
+      : path.resolve(baseDir, targetPath)
     const scriptPath = path.join(projectRoot, "scripts", "parse_document.py")
 
     try {
       const { stdout } = await execFileAsync(
         "python3",
-        [scriptPath, "--path", resolvedTarget, "--max-chars", String(args.maxChars)],
+        [scriptPath, "--path", resolvedTarget, "--max-chars", String(maxChars)],
         { maxBuffer: 10 * 1024 * 1024 }
       )
       return stdout.trim()

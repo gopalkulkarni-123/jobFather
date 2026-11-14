@@ -39,7 +39,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STATIC_DIR = Path(__file__).resolve().parent / "static"
+STATIC_DIR = Path(__file__).resolve().parent / "static"  # classic wizard UI, served at /classic/
+QUIET_DIR = Path(__file__).resolve().parent / "quiet"  # default UI, served at /
 INPUTS_DIR = PROJECT_ROOT / "inputs"
 OUTPUTS_DIR = PROJECT_ROOT / "outputs"
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
@@ -391,10 +392,37 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
             except Exception:
                 pass
 
-    def serve_static(self, rel_path: str) -> None:
+    def run_command_in_background(self, sid: str, payload: dict) -> None:
+        """POST /session/{id}/command blocks until the whole agent run ends.
+        Start it in a thread and return right away; progress arrives over SSE."""
+        health = ENGINE.health()
+        if not health.get("healthy"):
+            ok, msg = ENGINE.start()
+            if not ok:
+                self.send_json({"error": msg}, status=503)
+                return
+        url = self.oc_url(f"/session/{sid}/command")
+        data = json.dumps(payload).encode("utf-8")
+
+        def worker() -> None:
+            req = urllib.request.Request(
+                url, data=data, headers={"Content-Type": "application/json"}, method="POST"
+            )
+            try:
+                with urllib.request.urlopen(req, timeout=6 * 3600) as resp:
+                    resp.read()
+            except urllib.error.HTTPError as exc:
+                sys.stderr.write(f"[studio-ui] command failed: {exc.code} {exc.read()[:300]!r}\n")
+            except Exception as exc:
+                sys.stderr.write(f"[studio-ui] command failed: {exc}\n")
+
+        threading.Thread(target=worker, daemon=True).start()
+        self.send_json({"ok": True, "started": True})
+
+    def serve_static(self, rel_path: str, root: Path = STATIC_DIR) -> None:
         clean = "index.html" if rel_path in ("", "/") else rel_path.lstrip("/")
         try:
-            target = safe_resolve_under(STATIC_DIR, clean)
+            target = safe_resolve_under(root, clean)
         except PermissionError:
             self.send_json({"error": "Forbidden"}, status=403)
             return
@@ -504,16 +532,36 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
             self.proxy_json("GET", "/question")
             return
 
+        if path == "/api/oc/permissions":
+            self.proxy_json("GET", "/permission")
+            return
+
+        if path == "/api/oc/session-status":
+            self.proxy_json("GET", "/session/status")
+            return
+
         m_msg = re.match(r"^/api/oc/session/([^/]+)/messages$", path)
         if m_msg:
             sid = urllib.parse.quote(m_msg.group(1), safe="")
             self.proxy_json("GET", f"/session/{sid}/message")
             return
 
-        # Serve static frontend assets
-        if path == "/" or path.startswith("/static/") or path in ("/index.html", "/styles.css", "/app.js"):
-            rel = path[len("/static/") :] if path.startswith("/static/") else path
-            self.serve_static(rel)
+        m_sess = re.match(r"^/api/oc/session/([^/]+)$", path)
+        if m_sess:
+            sid = urllib.parse.quote(m_sess.group(1), safe="")
+            self.proxy_json("GET", f"/session/{sid}")
+            return
+
+        # Quiet UI (default) at /, classic wizard UI at /classic/
+        if path == "/classic" or path == "/classic/":
+            self.serve_static("index.html", STATIC_DIR)
+            return
+        if path.startswith("/static/"):
+            self.serve_static(path[len("/static/") :], STATIC_DIR)
+            return
+        if path == "/" or path.startswith("/quiet/"):
+            rel = path[len("/quiet/") :] if path.startswith("/quiet/") else ""
+            self.serve_static(rel, QUIET_DIR)
             return
 
         self.send_json({"error": f"Unknown endpoint: {path}"}, status=404)
@@ -624,8 +672,6 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
                 "title": body.get("title") or "CV Tailor Session",
                 "agent": body.get("agent") or "career-architect",
             }
-            if body.get("model"):
-                payload["model"] = body["model"]
             self.proxy_json("POST", "/session", payload)
             return
 
@@ -651,7 +697,7 @@ class StudioRequestHandler(BaseHTTPRequestHandler):
             }
             if body.get("model"):
                 payload["model"] = str(body["model"])
-            self.proxy_json("POST", f"/session/{sid}/command", payload)
+            self.run_command_in_background(sid, payload)
             return
 
         m_abort = re.match(r"^/api/oc/session/([^/]+)/abort$", path)
