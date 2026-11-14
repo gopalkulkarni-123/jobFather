@@ -1,119 +1,170 @@
-# CV Tailor — Interactive OpenCode Career Workspace
+# CV Tailor
 
-An interactive **OpenCode** workspace that takes your **CV**, **LinkedIn**, **GitHub**, and a **Target Job Link**, interviews you with **5+ targeted discovery & design questions**, and outputs:
+CV Tailor is an OpenCode workspace that tailors your CV and cover letter to a specific job.
 
-1. **ATS-Friendly Tailored CV** — clean `.md` source + `.tex` (LaTeX) and/or `.typ` (Typst) source files
-2. **Tailored Cover Letter** — matching `.md` + `.tex` / `.typ` source files
-3. **Before & After Fitness Score Report** (`fitness_report.md`) — 100-point weighted rubric comparing your untouched CV against the tailored version, with full JD traceability and honest gap analysis
+You give it four inputs:
 
----
+- your CV
+- your LinkedIn profile
+- your GitHub profile
+- a link to the job posting
 
-## Quick Start (Web Studio UI — Recommended)
+The agent reads them, scores how well your current CV fits the job, and asks you at least five questions about gaps, metrics and layout. It then writes:
 
-Launch the **CV Tailor Studio** web interface (zero extra packages needed — automatically starts `opencode serve` in the background):
+1. A tailored, ATS-friendly CV (`.md`, plus `.tex` and/or `.typ`)
+2. A matching cover letter in the same formats
+3. A fitness report (`fitness_report.md`) with a before and after score out of 100
+
+The agent does not invent experience. If you lack a skill the job asks for, it lists that in the report instead of adding it to the CV.
+
+## Prerequisites
+
+### Required
+
+| Tool | Version | Why it is needed | Check |
+|---|---|---|---|
+| OpenCode | 1.19 or newer recommended | Runs the agent, tools and slash commands | `opencode --version` |
+| Python | 3.10 or newer | Web UI server and helper scripts in `scripts/` | `python3 --version` |
+| A model provider | any provider OpenCode supports | The agent needs an LLM | `opencode auth list` |
+| Internet access | | Job pages, GitHub API, model API, and a one-time download of the OpenCode plugin package for the custom tools | |
+
+Install OpenCode with one of these:
 
 ```bash
-/home/hpcgkulk/.gemini/antigravity/scratch/cv-tailor/start-ui.sh
+curl -fsSL https://opencode.ai/install | bash
+# or
+npm install -g opencode-ai
 ```
 
-Then open **http://127.0.0.1:8765** in your browser.
+Then log in to a model provider:
 
-### Quiet UI (default, `ui/quiet/`)
-
-OpenCode still does all the work. The page runs the real `/tailor` and `/score` commands and hides OpenCode's noise:
-
-- **Left:** upload CV and LinkedIn, enter GitHub and the job URL (or paste the job text), pick the source format, then press **Start tailoring** or **Score**.
-- **Center:** the agent's messages only. Tool calls are folded into one-line steps such as "Read the job posting". Questions from the `question` tool appear as cards, one at a time. Permission requests appear as Allow/Deny cards. Use the box at the bottom to ask for changes.
-- **Right:** before/after score, the generated CV, cover letter and report, with copy, download, zip and ATS check.
-- **Details** (top bar) shows reasoning plus tool inputs and outputs when you need to debug.
-- The session survives a page reload. **New session** starts fresh.
-- The old wizard UI is still available at **http://127.0.0.1:8765/classic/**.
-
-### Classic UI (`ui/static/`, at `/classic/`)
-
-1. **Left Panel (Inputs):** Drag-and-drop your CV (`.pdf`, `.docx`, `.md`, `.tex`) and LinkedIn PDF (or paste text), enter your GitHub URL and Target Job URL, and click **Start Tailoring**.
-2. **Center Panel (5+ Question Interview):** Watch your **Baseline Fitness Score**, click through interactive multi-choice + custom answer cards for the **5+ discovery & design questions**, and chat live with `career-architect`.
-3. **Right Panel (Score & Deliverables):** View your **Before -> After Fitness Score**, switch tabs across `.md`, `.tex`, and `.typ` CV/Cover Letter files, edit in-place, run **1-click ATS Checks**, or download a `.zip` bundle.
-4. *(Built-in Google SDK Cache Fix)*: Includes a **Fix SDK Cache** button in the top bar that clears stale `~/.cache/opencode` packages without touching your saved API keys.
-
----
-
-## Alternative: Terminal TUI Mode
-
-### 1. Add Your Base Materials in `inputs/`
-Place your files in `inputs/`:
-- `inputs/cv.pdf` (or `.docx`, `.md`, `.tex`, `.typ`, `.txt`)
-- `inputs/linkedin.pdf` (from LinkedIn **More -> Save to PDF**, or `inputs/linkedin.txt`)
-- *(Optional)* Copy `inputs/profile.example.json` -> `inputs/profile.json` to save your GitHub username/URL permanently.
-
-### 2. Launch OpenCode TUI
 ```bash
-opencode /home/hpcgkulk/.gemini/antigravity/scratch/cv-tailor
+opencode auth login
 ```
 
-The workspace automatically boots into the **`career-architect`** primary agent with custom tools (`parse_inputs`, `github_profile`, `job_posting`, `ats_check`) and interactive `question` prompts enabled.
+The Python scripts use only the standard library. You do not need `pip install` for the web UI or the scripts.
 
-### 3. Run a Slash Command Inside OpenCode
+### Optional
 
-| Slash Command | What It Does |
-| :--- | :--- |
-| `/tailor <job-url>` | **Full end-to-end flow**: Ingests CV + LinkedIn + GitHub + Job URL -> computes **Baseline Fitness Score** -> asks **5+ interactive gap & design questions** -> generates `.md` + `.tex`/`.typ` CV, Cover Letter, & Post-Tailoring Fitness Report -> runs deterministic ATS lint. |
-| `/score <job-url>` | **Quick triage**: Computes your Baseline Fitness Score (0–100) and lists key gaps before you commit to full tailoring. |
-| `/audit [output-dir]` | **Re-verify after manual edits**: Runs the deterministic ATS linter (`ats_check`) + `@ats-auditor` syntax/truthfulness review on your `.md`, `.tex`, or `.typ` files. |
+| Tool | What it adds |
+|---|---|
+| `pdftotext` (from `poppler-utils`) | Reads PDF CVs and LinkedIn exports. Recommended. |
+| `pypdf` (`pip install pypdf`) | Fallback PDF reader if `pdftotext` is not installed. |
+| `typst` | Compiles `.typ` files to PDF on your machine. |
+| `pdflatex` or `tectonic` | Compiles `.tex` files to PDF on your machine. You can also use Overleaf. |
+| `GITHUB_TOKEN` or `GH_TOKEN` environment variable | Raises the GitHub API rate limit when reading your repositories. |
 
----
+If you only use `.md`, `.docx` or `.txt` files as input, you do not need a PDF reader.
 
-## How the 5-Phase Interactive Loop Works
+## Setup
 
-```text
-Inputs (CV + LinkedIn + GitHub + Job URL)
-   │
-   ▼
-[Phase 1] Parse local PDF/DOCX/MD (`parse_inputs`) + GitHub API (`github_profile`) + Job Posting (`job_posting`)
-   │
-   ▼
-[Phase 2] Cross-reference evidence & compute Baseline Fitness Score (0–100)
-   │
-   ▼
-[Phase 3] Mandatory 5+ Question Interactive Interview (`question` tool)
-          • Q1: Unstated experience for missing JD must-haves
-          • Q2: Concrete metrics (%, $, latency, scale) for key bullets
-          • Q3: Which GitHub repos/projects to spotlight & technical framing
-          • Q4: CV vs. LinkedIn nuances or secondary technical/leadership probes
-          • Q5: Career narrative angle & Cover Letter hook/tone
-          • Q6–Q7: Design choices (.tex vs .typ, 1-page vs 2-page, section order)
-   │
-   ▼
-[Phase 4] Generate `outputs/<date>-<company>-<role>/` + run `ats_check` linter + compute After Score
-   │
-   ▼
-[Phase 5] Interactive feedback & refinement loop
+```bash
+git clone https://github.com/gopalkulkarni-123/jobFather.git cv-tailor
+cd cv-tailor
 ```
 
----
+Optional: save your GitHub handle so you do not have to enter it each time.
 
-## Compiling `.tex` or `.typ` Sources to PDF
+```bash
+cp inputs/profile.example.json inputs/profile.json
+# then edit "github" in inputs/profile.json
+```
 
-Your generated `.tex` and `.typ` files are zero-external-package, single-column ATS-compliant sources:
+Files you put in `inputs/` and everything in `outputs/` are ignored by git, so your personal data is not committed.
 
-- **Overleaf (Zero Local Install)**: Upload `tailored_cv.tex` or `cover_letter.tex` directly into Overleaf and click **Recompile**.
-- **Local Typst** (lightweight single binary):
-  ```bash
-  typst compile outputs/<folder>/tailored_cv.typ
-  ```
-- **Local LaTeX** (`pdflatex` or `tectonic`):
-  ```bash
-  pdflatex -output-directory=outputs/<folder> outputs/<folder>/tailored_cv.tex
-  ```
+## Run the web UI
 
----
+```bash
+./start-ui.sh
+```
 
-## Architecture Overview
+This starts `opencode serve` in the background and serves the UI at http://127.0.0.1:8765.
 
-- `opencode.json` — Configures `career-architect` as default primary agent and enables OpenCode's native `question` tool + custom tools.
-- `AGENTS.md` — Enforces strict project guardrails (zero fabrication, >=5 questions before output, Before/After fitness scoring, single-column ATS compliance).
-- `.opencode/agents/` — `career-architect.md` (primary), `profile-researcher.md` (subagent), `ats-auditor.md` (subagent).
-- `.opencode/commands/` — `/tailor`, `/score`, and `/audit` slash commands.
-- `.opencode/skills/` — `discovery-interview`, `fitness-rubric`, and `ats-optimization` domain modules.
-- `.opencode/tools/` — Custom TypeScript tools (`parse_inputs`, `github_profile`, `job_posting`, `ats_check`) backed by zero-dependency Python 3 scripts in `scripts/`.
-- `templates/` — Clean, linear-text-stream ATS templates in Markdown (`.md`), LaTeX (`.tex`), and Typst (`.typ`).
+Options:
+
+```bash
+./start-ui.sh --port 9000                 # use another port
+./start-ui.sh --no-autostart-opencode     # start OpenCode only on the first request
+OPENCODE_SERVER_URL=http://127.0.0.1:4096 ./start-ui.sh   # use an OpenCode server you already started
+```
+
+If you run it on a remote machine, forward the port from your laptop first:
+
+```bash
+ssh -L 8765:127.0.0.1:8765 <user>@<host>
+```
+
+### Using the UI
+
+- **Left panel:** upload your CV and LinkedIn PDF (or paste the LinkedIn text), enter your GitHub, paste the job URL (or the job text), and choose the output format. Press **Start tailoring** for the full run, or **Score** for a quick baseline score.
+- **Center panel:** the agent's messages. Tool calls are shown as short one-line steps. Questions appear as cards, one at a time. Permission requests appear as Allow and Deny buttons. Use the box at the bottom to ask for changes, for example "make the summary shorter".
+- **Right panel:** the before and after scores, and the generated CV, cover letter and report. You can copy, download, zip, or run an ATS check on the CV.
+- **Details** in the top bar shows the agent's reasoning and the full tool inputs and outputs. Use it when something goes wrong.
+- The current session is kept when you reload the page. **New session** starts over.
+- The older wizard UI is still available at http://127.0.0.1:8765/classic/.
+
+## Run in the terminal instead
+
+Put your files in `inputs/` (see `inputs/README.md`), then start OpenCode in the project folder:
+
+```bash
+opencode .
+```
+
+Then use one of these commands:
+
+| Command | What it does |
+|---|---|
+| `/tailor <job-url>` | Full run: read inputs, baseline score, at least 5 questions, write the CV, cover letter and report, run the ATS check |
+| `/score <job-url>` | Baseline score and main gaps only |
+| `/audit [output-folder]` | Run the ATS check and a review again after you edit the files by hand |
+
+## Output
+
+Each run writes to its own folder:
+
+```
+outputs/<yyyy-mm-dd>-<company>-<role>/
+  tailored_cv.md
+  tailored_cv.tex and/or tailored_cv.typ
+  cover_letter.md
+  cover_letter.tex and/or cover_letter.typ
+  fitness_report.md
+```
+
+To get a PDF:
+
+```bash
+typst compile outputs/<folder>/tailored_cv.typ
+pdflatex -output-directory=outputs/<folder> outputs/<folder>/tailored_cv.tex
+```
+
+Or upload the `.tex` file to Overleaf.
+
+## Project layout
+
+| Path | Contents |
+|---|---|
+| `opencode.json` | Sets `career-architect` as the default agent and sets tool permissions |
+| `AGENTS.md` | Project rules: no invented experience, at least 5 questions, before and after scoring, ATS rules |
+| `.opencode/agents/` | `career-architect` (main agent), `profile-researcher` and `ats-auditor` (subagents) |
+| `.opencode/commands/` | The `/tailor`, `/score` and `/audit` commands |
+| `.opencode/skills/` | Interview, scoring rubric and ATS guidance |
+| `.opencode/tools/` | Custom tools `parse_inputs`, `github_profile`, `job_posting`, `ats_check` |
+| `scripts/` | Python scripts behind the custom tools |
+| `templates/` | CV and cover letter templates in Markdown, LaTeX and Typst |
+| `ui/server.py` | Web server. Starts OpenCode and passes requests to it |
+| `ui/quiet/` | Default web UI |
+| `ui/static/` | Older wizard UI, served at `/classic/` |
+
+## Troubleshooting
+
+| Problem | What to do |
+|---|---|
+| `Could not find opencode binary` | Install OpenCode, or make sure `opencode` is on your `PATH`. |
+| The page still shows the old UI | Stop the old server (`pkill -f ui/server.py; pkill -f "opencode serve"`), run `./start-ui.sh` again, then reload with Ctrl+Shift+R. |
+| `Address already in use` | Another server is using port 8765. Stop it, or use `--port`. |
+| Stuck on "Working..." | Look at the terminal running `./start-ui.sh` for errors, and turn on **Details** in the UI. |
+| PDF text is empty | Install `pdftotext` (`poppler-utils`) or `pypdf`. |
+| The job page cannot be read | Some job sites need a login or block scripts. Paste the job text in the UI instead. |
+| GitHub rate limit errors | Set `GITHUB_TOKEN` before starting the UI. |
