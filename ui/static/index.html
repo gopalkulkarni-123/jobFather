@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CV Tailor</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="shell">
+    <!-- MINIMAL HEADER -->
+    <header class="header">
+      <div class="logo-row">
+        <span class="logo-dot" id="engineDot" title="OpenCode engine"></span>
+        <span class="logo-text">CV Tailor</span>
+      </div>
+
+      <div class="steps-nav">
+        <button class="step-pill active" data-goto="inputs" id="navInputs" type="button">1. Inputs</button>
+        <span class="step-sep">/</span>
+        <button class="step-pill" data-goto="interview" id="navInterview" type="button" disabled>2. Questions</button>
+        <span class="step-sep">/</span>
+        <button class="step-pill" data-goto="results" id="navResults" type="button" disabled>3. Results</button>
+      </div>
+
+      <div class="header-right">
+        <button class="text-btn" id="resetBtn" type="button">Start over</button>
+        <details class="settings-menu">
+          <summary class="icon-btn" title="OpenCode Model &amp; Settings">&#9881;</summary>
+          <div class="settings-popover">
+            <label class="field-label" for="modelSelect">OpenCode Model</label>
+            <select id="modelSelect" class="input">
+              <option value="">Default model</option>
+            </select>
+            <label class="field-label mt-10" for="formatPrefSelect">Output Source Formats</label>
+            <select id="formatPrefSelect" class="input">
+              <option value="both">Markdown + LaTeX (.tex) + Typst (.typ)</option>
+              <option value="latex">Markdown + LaTeX (.tex)</option>
+              <option value="typst">Markdown + Typst (.typ)</option>
+            </select>
+            <button class="btn btn-secondary full mt-10" id="repairCacheBtn" type="button">
+              Refresh Google SDK Cache
+            </button>
+          </div>
+        </details>
+      </div>
+    </header>
+
+    <!-- ERROR ALERT (ONLY SHOWN IF NEEDED) -->
+    <div class="alert hidden" id="errorBanner">
+      <span id="errorBannerText"></span>
+      <div class="alert-actions">
+        <button class="btn btn-primary btn-sm hidden" id="errorRepairBtn" type="button">Fix &amp; Retry</button>
+        <button class="text-btn" id="dismissErrorBtn" type="button">Dismiss</button>
+      </div>
+    </div>
+
+    <!-- VIEW 1: SIMPLE INPUTS CARD -->
+    <main class="card" id="viewInputs">
+      <h1 class="card-title">Tailor your application</h1>
+      <p class="card-sub">Drop your details below. OpenCode will review your profile and ask a few targeted questions before writing your CV and cover letter.</p>
+
+      <div class="form-grid">
+        <!-- CV -->
+        <div class="field">
+          <div class="field-top">
+            <label class="field-label">CV / Resume</label>
+            <span class="status-tag" id="cvTag">Required</span>
+          </div>
+          <label class="upload-box" id="cvDropzone">
+            <input type="file" id="cvFileInput" accept=".pdf,.docx,.md,.tex,.typ,.txt" hidden />
+            <span id="cvLabel">Choose file or drop PDF, DOCX, MD, TEX</span>
+          </label>
+        </div>
+
+        <!-- LINKEDIN -->
+        <div class="field">
+          <div class="field-top">
+            <label class="field-label">LinkedIn</label>
+            <button class="link-toggle" id="toggleLinkedinMode" type="button">Paste text instead</button>
+          </div>
+          <label class="upload-box" id="linkedinDropzone">
+            <input type="file" id="linkedinFileInput" accept=".pdf,.txt,.md,.docx" hidden />
+            <span id="linkedinLabel">Drop LinkedIn &ldquo;Save to PDF&rdquo; export</span>
+          </label>
+          <textarea
+            id="linkedinTextInput"
+            class="input hidden"
+            rows="3"
+            placeholder="Paste your LinkedIn About &amp; Experience text..."
+          ></textarea>
+        </div>
+
+        <!-- GITHUB -->
+        <div class="field">
+          <div class="field-top">
+            <label class="field-label" for="githubInput">GitHub</label>
+          </div>
+          <input type="text" id="githubInput" class="input" placeholder="github.com/username" />
+        </div>
+
+        <!-- TARGET JOB -->
+        <div class="field">
+          <div class="field-top">
+            <label class="field-label" for="jobUrlInput">Target Job</label>
+            <button class="link-toggle" id="toggleJobMode" type="button">Paste description instead</button>
+          </div>
+          <input type="url" id="jobUrlInput" class="input" placeholder="https://company.com/jobs/..." />
+          <textarea
+            id="jobTextInput"
+            class="input hidden"
+            rows="4"
+            placeholder="Paste the job description text here..."
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="card-footer">
+        <button class="btn btn-primary btn-lg full" id="startBtn" type="button">
+          Continue &rarr;
+        </button>
+      </div>
+    </main>
+
+    <!-- VIEW 2: CALM INTERVIEW / WORKING VIEW (NO VERBOSE OPENCODE LOGS) -->
+    <main class="card hidden" id="viewInterview">
+      <!-- Subtle Baseline Score Strip once computed -->
+      <div class="baseline-strip hidden" id="baselineStrip">
+        <span>Starting Fit Score</span>
+        <strong id="baselinePillVal">&mdash;</strong>
+      </div>
+
+      <!-- Quiet Working State (shown while OpenCode runs tools / thinks) -->
+      <div class="working-state" id="workingState">
+        <div class="spinner"></div>
+        <div class="working-title" id="workingTitle">Analyzing your profile &amp; job link...</div>
+        <div class="working-sub" id="workingSub">OpenCode is working quietly in the background.</div>
+        <button class="text-btn mt-14" id="cancelRunBtn" type="button">Stop</button>
+      </div>
+
+      <!-- Focused One-Question-at-a-Time Card -->
+      <div class="question-stage hidden" id="questionStage">
+        <div class="q-meta">
+          <span class="q-badge" id="qCounterLabel">Question 1</span>
+          <span class="q-topic" id="qHeaderLabel"></span>
+        </div>
+
+        <h2 class="q-title" id="qPromptText"></h2>
+
+        <div class="q-choices" id="qChoicesList"></div>
+
+        <div class="q-custom-wrap" id="qCustomWrap">
+          <input
+            type="text"
+            id="qCustomInput"
+            class="input"
+            placeholder="Or type your own answer / extra details..."
+          />
+        </div>
+
+        <div class="q-nav">
+          <button class="btn btn-secondary" id="qPrevBtn" type="button">Back</button>
+          <button class="btn btn-primary" id="qNextBtn" type="button">Next &rarr;</button>
+        </div>
+      </div>
+
+      <!-- Permission prompt if OpenCode ever asks -->
+      <div class="perm-strip hidden" id="permStrip"></div>
+    </main>
+
+    <!-- VIEW 3: CLEAN RESULTS & SIMPLE FEEDBACK BAR -->
+    <main class="card card-wide hidden" id="viewResults">
+      <!-- Fitness Score Summary -->
+      <div class="score-banner">
+        <div class="score-metric">
+          <span class="score-caption">Before</span>
+          <span class="score-num muted" id="resBeforeScore">&mdash;</span>
+        </div>
+        <div class="score-arrow">&rarr;</div>
+        <div class="score-metric">
+          <span class="score-caption">Fitness Score</span>
+          <span class="score-num accent" id="resAfterScore">&mdash;</span>
+        </div>
+        <div class="score-spacer"></div>
+        <a class="btn btn-secondary btn-sm" id="downloadAllZipBtn" href="#" download>Download All (.zip)</a>
+      </div>
+
+      <!-- Clean Deliverable Tabs -->
+      <div class="results-bar">
+        <div class="doc-tabs">
+          <button class="doc-tab active" data-doc="cv" type="button">Tailored CV</button>
+          <button class="doc-tab" data-doc="cover" type="button">Cover Letter</button>
+          <button class="doc-tab" data-doc="report" type="button">Fitness Breakdown</button>
+        </div>
+
+        <div class="doc-actions">
+          <select id="docFormatSelect" class="input input-sm">
+            <option value=".md">Markdown (.md)</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" id="copyBtn" type="button">Copy</button>
+          <button class="btn btn-secondary btn-sm" id="downloadBtn" type="button">Download</button>
+        </div>
+      </div>
+
+      <!-- Clean Document Reader -->
+      <div class="doc-reader markdown-body" id="docReader"></div>
+
+      <!-- Simple 1-Line Feedback Input Back to OpenCode -->
+      <form class="feedback-bar" id="feedbackForm">
+        <input
+          type="text"
+          id="feedbackInput"
+          class="input"
+          placeholder="Want to tweak anything? Ask OpenCode (e.g. 'make the cover letter shorter' or 'emphasize Python more')..."
+        />
+        <button class="btn btn-primary" type="submit" id="feedbackSubmitBtn">Update</button>
+      </form>
+    </main>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "career-architect",
+  "permission": {
+    "question": "allow",
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "parse_inputs": "allow",
+    "github_profile": "allow",
+    "job_posting": "allow",
+    "ats_check": "allow",
+    "edit": "allow",
+    "write": "allow",
+    "bash": "ask"
+  }
+}
